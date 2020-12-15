@@ -1,3 +1,0 @@
-blk_no,host_name,blk_size
-0,thumm02,1048576
-1,thumm02,1048576
