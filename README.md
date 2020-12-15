@@ -6,15 +6,18 @@
 
 该DFS实现了简单分布式文件系统的功能，包含了NameNode、DataNode、CLient三部分，其中NameNode负责记录文件块的位置（FAT表）， DataNode负责数据的存储与读取，而Client则是用户与DFS交互的接口。
 
-该DFS主要实现了ls / copyFromLocal /copyToLocal功能, 大家可以在这个基础上完成以下功能：
+该DFS主要实现了ls / copyFromLocal /copyToLocal/mapReduce功能, 该DFS有如下优化或功能功能
 
-- 实现复数个块副本。 这个DFS的dfs_replication为1，也就是一个数据块存储在一台主机上，大家需要修改common.py里的配置，以及NameNode、DataNode、CLient中对于的部分，实现存储多副本块存储。
+- 实现复数个块副本。在common.py文件中设置dfs_replication的大小（目前设置为2）
 
-- 利用该框架实现 均值和方差统计 功能，数据可以自己采集或随机生成，无固定格式要求，数据文件大小需要大于1G，小于5G。
+- 实现统一的socket收发接口，解决粘包问题
 
-- （加分项）有一定的任务错误处理机制（比如某台节点宕机或者出现数据块丢失）
+- 实现缓存策略，利用内存缓存命中加速文件数据的读取，并可由用户配置缓存大小（设为0则不利用缓存加速，可在common.py文件中设置mem_cache的大小），提供LRU, LFU算法供用户选择执行不同的缓存块换出策略（目前只实现了这两种换出策略）
 
-在写实验报告时需要详细阐述你的设计，包括整体设计思想，系统框架，数据分割方案，任务分配和整合方案等细节，体现你对DFS和MapReduce思想的理解。
+- 通过多线程,semaphore实现文件的异步存取，避免主线程由于写磁盘造成的时间开销
+
+- 配合wuyi-master-node-web和wuyi-master-node实现DFS系统的动态监控，实时展示DFS内存占用率，空余内存大小，DFS磁盘使用情况，当前节点的状态信息（如是否已启动,pid号等），集群的信息总览（各个节点的端口号，集群节点，集群文件信息，块大小）等等
+
 
 
 #### 1.2. 目录结构
@@ -28,6 +31,7 @@
     - name_node.py : NameNode程序
     - data_node.py : DataNode程序
     - client.py : Client程序，用于用户与DFS交互
+    - utils.py : 工具类包，公共函数放在此处
 
 #### 1.3. 模块功能
 
@@ -38,12 +42,14 @@
     - new_fat_item： 根据文件大小创建FAT表项
     - rm_fat_item： 删除一个FAT表项
     - format: 删除所有FAT表项
+    - get_all_data : 实现了所有服务节点数据信息的采集并封装成json数据发送给wuyi-master-node
 
 - data_node.py
-    - load 加载数据块
-    - store 保存数据块
-    - rm 删除数据块
-    - format 删除所有数据块
+    - load ：加载数据块
+    - store ：保存数据块
+    - rm ：删除数据块
+    - format ：删除所有数据块
+    - run_mapreduce ：执行MR任务
 
 - client.py
     - ls : 查看当前目录文件/目录信息
@@ -51,7 +57,7 @@
     - copyToLocal ： 从DFS复制数据到本地
     - rm ： 删除DFS上的文件
     - format ：格式化DFS
-
+    - map_reduce ：执行MR任务
 ### 二、操作步骤
 
 0. 进入MyDFS目录
@@ -77,7 +83,7 @@ $ python3 data_node.py
 - copyToLocal <dfs_path> <local_path> : 从DFS复制文件到本地
 - rm <dfs_path> : 删除DFS上的文件
 - format : 格式化DFS
-
+- map_reduce：执行MR
 
 首先从本地复制一个文件到DFS
 
