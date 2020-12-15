@@ -7,7 +7,7 @@ import time
 import pandas as pd
 from common import *
 from utils import *
-
+from queue import Queue
 
 # DataNode支持的指令有:
 # 1. load 加载数据块
@@ -91,9 +91,10 @@ class DataNode:
 
     def store(self, sock_fd, dfs_path):
         global mem_count
-        global mem_cache
+        global data_node_mem_cache
         global hostname
         global sem
+        global fifo_queue
 
         # 从Client获取块数据
         chunk_data = strong_sck_recv(sock_fd)
@@ -103,7 +104,7 @@ class DataNode:
         os.system("mkdir -p {}".format(os.path.dirname(local_path)))
 
         # 如果超过我们开始设定的最大缓存(即缓存用完)，则选择换出策略
-        if mem_count > mem_cache*1024:
+        if mem_count > data_node_mem_cache*1024:
             #如果缓存策略采用的是LRU
             if default_cache_swapout_strategy == CacheSwapoutStrategy.LRU:
                 sorted_mem_data = sorted(mem_data_map.items(), key=lambda item: item[1][2])
@@ -114,7 +115,7 @@ class DataNode:
                     del mem_data_map[curr_data[0]]
                     mem_count-=curr_data_size
                     #如果新加进来的数据满足缓存大小的要求，那么现在就可以安全退出了
-                    if mem_count+len(chunk_data)< mem_cache*1024:
+                    if mem_count+len(chunk_data)< data_node_mem_cache*1024:
                         break
             #如果缓存策略采用的是 LFU
             elif default_cache_swapout_strategy == CacheSwapoutStrategy.LFU:
@@ -126,13 +127,21 @@ class DataNode:
                     del mem_data_map[curr_data[0]]
                     mem_count -= curr_data_size
                     # 如果新加进来的数据满足缓存大小的要求，那么现在就可以安全退出了
-                    if mem_count + len(chunk_data) < mem_cache * 1024:
+                    if mem_count + len(chunk_data) < data_node_mem_cache * 1024:
                         break
+            #如果缓存策略采用的是FIFO
+            elif default_cache_swapout_strategy == CacheSwapoutStrategy.FIFO:
+                while True:
+                    if(mem_count+ len(chunk_data) < data_node_mem_cache * 1024):
+                        break
+                    victim=fifo_queue.get()
+                    del mem_data_map[victim]
         # 进行存储,值为[数据，命中次数，当前时间戳]
         mem_data_map[local_path] = [chunk_data,1,time.time()]
         # 并计算本次数据的字节数
         mem_count = mem_count + len(chunk_data)
-
+        fifo_queue.put(local_path)
+        
         # 将数据块写入本地文件
         thread_store= StroeThread(local_path=local_path,chunk_data=chunk_data,semaphore=sem)
         thread_store.start()
@@ -186,6 +195,7 @@ class DataNode:
 data_node = DataNode()
 hostname = os.popen("hostname")
 mem_count = 0
-sem = threading.Semaphore(4)  # 限制线程的最大数量为4个
+sem = threading.Semaphore(max_thread)  # 限制线程的最大数量为max_thread个
 mem_data_map = {}
+fifo_queue = Queue(maxsize=0)
 data_node.run()

@@ -1,9 +1,11 @@
 from enum import Enum
 
 dfs_replication = 2
-dfs_blk_size = 4096  # * 单位字节
+dfs_blk_size = 4096  # * 单位字节,此可以理论上可以设为任意大，但务必比PACK_SIZE（最大1500）设置要大
 
-mem_cache=1024 # 单位MB，1024MB=1GB
+data_node_mem_cache=1024 #单位MB，1024MB=1GB,设置为0则代表data node不用缓存加速
+name_node_mem_cache=512 #单位MB,如512MB，设置为0则代表name node不用缓存加速
+max_thread=4
 
 # NameNode和DataNode数据存放位置
 name_node_dir = "./dfs/name"
@@ -24,12 +26,15 @@ BUF_SIZE = dfs_blk_size * 2
 PACK_SIZE = 1024
 PACK_SIZE_FMT = str(PACK_SIZE) + 's'
 
+
 #缓存换出策略
 class CacheSwapoutStrategy(Enum):
     #采用最近最久未使用策略
     LRU=1
     #采用最近最少使用策略
     LFU=2
+    #采用先进先出策略
+    FIFO=3
 
 #默认缓存换出策略为LRU
 default_cache_swapout_strategy=CacheSwapoutStrategy.LRU
