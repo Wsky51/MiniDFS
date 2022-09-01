@@ -21,7 +21,7 @@
 
 
 #### 1.2. 目录结构
-- MyDFS : 根目录
+- MiniDFS : 根目录
     - dfs : DFS文件夹，用于存放DFS数据
         - name : 存放NameNode数据
         - data : 存放DataNode数据
@@ -60,9 +60,9 @@
     - map_reduce ：执行MR任务
 ### 二、操作步骤
 
-0. 进入MyDFS目录
+0. 进入MiniDFS目录
 ```
-$ cd MyDFS
+$ cd MiniDFS
 ``
 1. 启动NameNode
 
